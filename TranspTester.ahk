@@ -11,12 +11,20 @@ SourceConstantAlpha := 255 ; opaque (WinSet, Transparent, Off is better,)
 hexCol := 0xFFFFFF ;white
 hexColUnder := hexCol
 hexColOver := -1
+hexColTransCol := -1
+hexColLayer := -1
 myRedUnder := -1
 myGreenUnder := -1
 myBlueUnder := -1
 myRedOver := -1
 myGreenOver := -1
 myBlueOver := -1
+myRedLayer := -1
+myGreenLayer := -1
+myBlueLayer := -1
+myRedTransCol := -1
+myGreenTransCol := -1
+myBlueTransCol := -1
 myTranspUnder := 0
 myTranspOver := -1
 myTransIntensityUnder := 0
@@ -35,6 +43,9 @@ WS_MINIMIZEBOX := 0x20000
 WS_OVERLAPPED := 0x00000000
 WS_VISIBLE := 0x10000000
 
+
+hdc_bmp := 0
+screenDC := 0
 ;DC's for these window styles are handled by the system
 CS_CLASSDC := 0x0040
 CS_OWNDC := 0x0020
@@ -92,18 +103,16 @@ WS_EX_LAYERED := 0x00080000
 ; The window is a layered window. This style cannot be used if the window has a class style of either CS_OWNDC or CS_CLASSDC. However, Win 8 does support the WS_EX_LAYERED style for child windows, where previous Windows versions support it only for top-level windows.
 GW_CHILD := 0X05
 
-
-
 OverlayVisible := 0
 
-; ---------------------- CUSTOMIZE BELOW HERE ----------------------
+; ---------------------- More Variable decls----------------------
+guiWidth := 0
+guiHeight := 0
+htmlW := floor(A_ScreenWidth/2)
+htmlH := floor(2 * (A_ScreenHeight/5))
 
-PositionX := A_ScreenWidth/4     ; x position of top left corner of overlay
-PositionY := A_ScreenHeight/5    ; y position of top left corner of overlay
-htmlW := PositionX * 2
-htmlH := PositionY * 2
 tmp := 0
-controlW := PositionX/2
+controlW := floor(A_ScreenWidth/8)
 x := 0, y := 0, w := 0, h := 0
 
 ; Helps with flickering on move
@@ -113,7 +122,10 @@ OnMessage(0x14, "WM_ERASEBKGND")
 
 
 ;Must be -%WS_SYSMENU% or else the WM_INITMENUPOPUP interferes with capture of mousedown on titlebar- alternatively try EnableMenuItem(wparam, SC_MOVE, MF_DISABLED) https://social.msdn.microsoft.com/Forums/en-US/2ab0cc68-91de-4aea-8ea0-b0082aee4eb2/how-to-disable-title-bar-context-menu-move?forum=winforms
-Gui, +OwnDialogs -%WS_SYSMENU% +%WS_OVERLAPPED%
+Gui, +OwnDialogs +HwndTranspTesterHwnd -%WS_SYSMENU% +%WS_OVERLAPPED%
+
+
+
 
 Gui, Add, Radio, section vuseImage guseImage HWNDuseImageHwnd, Use Image in Underlay
 Gui, Add, Radio, vuseActiveX guseActiveX HWNDuseActiveXHwnd, Use ActiveX in Underlay
@@ -126,7 +138,7 @@ Gui, Add, Checkbox, vuseOverlay guseOverlay HWNDuseOverlayHwnd, Use Overlay
 Gui, Add, Radio, ys vuseTransColor guseTransColor HWNDuseTransColorHwnd, Use TransColor
 Gui, Add, Radio, vuseLayered guseLayered HWNDuseLayeredHwnd, Use Layering
 Gui, Add, Radio, vuseNeither guseNeither HWNDuseNeitherHwnd, Use Neither
-
+GuiControl,, useNeither, 1
 
 Gui, Add, text,
 
@@ -175,6 +187,12 @@ Gui, Add, Button, yp x+m gQuit vQuit HWNDquitHwnd wp, &Quit
 
 Gui, Show
 
+; Window must be visible
+GuiGetSize(guiWidth, guiHeight, TranspTesterHwnd)
+targWidth := floor((306/372) * guiWidth)
+targHeight := floor((350/425) * guiHeight)
+
+
 scriptLoaded := 1
 SetTimer, DetectMouse, 50
 Return
@@ -212,6 +230,74 @@ enableTranspCtrls(ByRef myTranspUnder, ByRef myTranspOver, overlayWindow, ctrlEn
 		GuiControl, +Range0-0, Transpt
 		}
 }
+ctrlMast(ctrlEnable, isLayered)
+{
+global
+
+	if (isLayered)
+	{
+		if (myRedUnder > -1)
+		{
+		GuiControlGet, myRedUnder,, myRed
+		myRedTransCol := myRedUnder
+		}
+		if (myGreenUnder > -1)
+		{
+		GuiControlGet, myGreenUnder,, myGreen
+		myGreenTransCol := myGreenUnder
+		}
+		if (myBlueUnder > -1)
+		{
+		GuiControlGet, myBlueUnder,, myBlue
+		myBlueTransCol := myBlueUnder
+		}
+
+	GuiControlGet, hexColUnder,, myHex
+	hexColTransCol := hexColUnder
+
+	if (!ctrlEnable)
+	Return
+
+	hexColUnder := hexColLayer
+	(myRedLayer = -1)? (myRedUnder := 255): myRedUnder := myRedLayer
+	(myGreenLayer = -1)? (myGreenUnder := 255): myGreenUnder := myGreenLayer
+	(myBlueLayer = -1)? (myBlueUnder := 255): myBlueUnder := myBlueLayer
+
+	GuiControl, text, %txtIntensityHwnd%, Underlay Intensity:
+	}
+	else
+	{
+
+		if (myRedUnder > -1)
+		{
+		GuiControlGet, myRedUnder,, myRed
+		myRedLayer := myRedUnder
+		}
+		if (myGreenUnder > -1)
+		{
+		GuiControlGet, myGreenUnder,, myGreen
+		myGreenLayer := myGreenUnder
+		}
+		if (myBlueUnder > -1)
+		{
+		GuiControlGet, myBlueUnder,, myBlue
+		myBlueLayer := myBlueUnder
+		}
+
+	GuiControlGet, hexColUnder,, myHex
+	hexColLayer := hexColUnder
+	if (!ctrlEnable)
+	Return
+	hexColUnder := hexColTransCol
+	(myRedTransCol = -1)? (myRedUnder := 255): myRedUnder := myRedTransCol
+	(myGreenTransCol = -1)? (myGreenUnder := 255): myGreenUnder := myGreenTransCol
+	(myBlueTransCol = -1)? (myBlueUnder := 255): myBlueUnder := myBlueTransCol
+
+	GuiControl, text, %txtIntensityHwnd%, TransColor Intensity:
+	}
+
+}
+
 enableTransColorCtrls(ctrlEnable := 0, isLayered := 0)
 {
 global
@@ -219,32 +305,13 @@ global
 (ctrlEnable)? enable := "Enable": enable := "Disable"
 
 	GuiControl, Enable, Use Layering
+	if (ctrlEnable != 1)
+	ctrlMast(ctrlEnable, isLayered)
 
 
 
-	if (isLayered)
-	{
-	GuiControl, Enable, %txtIntensityHwnd%
-	GuiControl, text, %txtIntensityHwnd%, Underlay Intensity:
-	GuiControl, Enable, transColUnd
-		if (overlayWindow)
-		GuiControl, Enable, transColOver
-		else
-		GuiControl, Disable, transColOver
+	
 
-	GuiControl, Disable, myRed
-	GuiControl, Disable, myGreen
-	GuiControl, Disable, myBlue
-	GuiControl, Disable, myHex
-	GuiControl, Disable, Colour
-	GuiControl, Enable, transIntensity
-	GuiControl, Enable, transColIntensity
-
-	GuiControl, +Range0-255, transColIntensity
-	}
-	else
-	{
-	GuiControl, text, %txtIntensityHwnd%, TransColor Intensity:
 	GuiControl, %enable%, %txtIntensityHwnd%
 	GuiControl, %enable%, transColUnd
 		if (overlayWindow)
@@ -259,32 +326,67 @@ global
 	GuiControl, %enable%, Colour
 	GuiControl, %enable%, transIntensity
 	GuiControl, %enable%, transColIntensity
+	GuiControl, %enable%, useOverlay
 		if (ctrlEnable)
 		{
-		GuiControl, +Range0-255, myRed
-		GuiControl, , myRed, 255
-		GuiControl, +Range0-255, myGreen
-		GuiControl, , myGreen, 255
-		GuiControl, +Range0-255, myBlue
-		GuiControl, , myBlue, 255
-		GuiControl, +Range0-255, transColIntensity
-			if (!overlayWindow)
+			if (overlayWindow)
 			{
-			myTransIntensityOver := 0
-			hexColOver := -1
-			GuiControl,, %transColUndHwnd%, 1
+tmp := tmp
+			}
+			else
+			{
+				; Clicked from either Transcol or Layered
+				if (ctrlEnable = 2)
+				{
+				GuiControl, +Range0-255, myRed
+				GuiControl, , myRed, % (myRedUnder = -1)? 255: myRedUnder
+				GuiControl, +Range0-255, myGreen
+				GuiControl, , myGreen, % (myGreenUnder = -1)? 255: myGreenUnder
+				GuiControl, +Range0-255, myBlue
+				GuiControl, , myBlue, % (myBlueUnder = -1)? 255: myBlueUnder
+				GuiControl, +Range0-255, transColIntensity
+				}
+				else
+				{
+				GuiControlGet, transColOver,, transColOver
+
+					if (transColOver)
+					{
+					GuiControl,, transColUnd, 1
+					GuiControl,, transColOver, 0
+					GuiControl, , myRed, %myRedUnder%
+					GuiControl, , myGreen, %myGreenUnder%
+					GuiControl, , myBlue, %myBlueUnder%
+					}
+					else
+					msgbox Should never get here!
+				}
+
 			GuiControl,, myHex, % hexColUnder
+			GuiControl, +Background%hexColUnder%, Colour
+			myTransIntensityOver := 0
+
+			hexColOver := -1
 			}
 		}
 		else
 		{
-		myTransIntensityUnder := 0
 			if (overlayWindow)
 			{
 			myTransIntensityOver := 0
 			hexColOver := -1
+				if (!myTransIntensityUnder)
+				{
+				hexCol := hexColUnder
+				GuiControlGet, transColIntensity,, transColIntensity
+				myTransIntensityUnder := transColIntensity
+				}
 			}
-		hexCol := 0xFFFFFF
+			else
+			{
+				hexCol := 0xFFFFFF
+			}
+
 		GuiControl,, myHex, % hexCol
 		hexColUnder := hexCol
 		
@@ -308,8 +410,6 @@ global
 		}
 
 
-	}
-
 
 	if (myTransIntensityOver)
 	{
@@ -325,28 +425,35 @@ global
 
 useOverlay:
 Gui, Submit, Nohide
-GuiControlGet, overlayWindow,, useOverlay
 GuiControlGet, tmp,, useTransColor
 GuiControlGet, useLayering,, useLayered
-	if (!overlayWindow)
-	{
-		if (useLayering)
-		GuiControl,, useNeither, 1
-	}
-enableTransColorCtrls(tmp, useLayering)
+	if (!tmp && !useLayering)
+	Return
+
+GuiControlGet, overlayWindow,, useOverlay
+
+enableTransColorCtrls(1, useLayering)
 
 
 GuiControlGet, tmp,, useTransparency
 enableTranspCtrls(myTranspUnder, myTranspOver, overlayWindow, tmp)
 
 Return
+
+useTransColor:
+Gui, Submit, Nohide
+overlayWindow := 0
+enableTransColorCtrls(2)
+GuiControl,, useOverlay, 0
+Return
+
 useLayered:
 ;Won't work with CS_OWNDC or CS_CLASSDC
 Gui, Submit, Nohide
-GuiControlGet, tmp,, useTransColor
+overlayWindow := 0
 GuiControlGet, useLayering,, useLayered
-enableTransColorCtrls(tmp, useLayering)
-
+GuiControl,, useOverlay, 0
+enableTransColorCtrls(2, useLayering)
 
 Return
 
@@ -359,10 +466,6 @@ useTransparency:
 Gui, Submit, Nohide
 GuiControlGet, tmp,, useTransparency
 enableTranspCtrls(myTranspUnder, myTranspOver, overlayWindow, tmp)
-Return
-useTransColor:
-Gui, Submit, Nohide
-enableTransColorCtrls(1)
 Return
 transColIntensity:
 Gui, Submit, Nohide
@@ -409,21 +512,21 @@ GuiControlGet, tmp,, TransIntensity
 	GuiControl,, TransIntensity, % myTransIntensityUnder
 	}
 
-	if (!useLayering)
-	{
+
 	GuiControlGet, tmp,, myHex
 	hexColOver := tmp
 		if (hexColUnder > -1)
 		GuiControl,, myHex, % hexColUnder
-			if (tmp)
-			{
+
+		if (tmp)
+		{
 			if (myRed > -1)
 			myRedOver := myRed
 			if (myGreen > -1)
 			myGreenOver := myGreen
 			if (myBlue > -1)
 			myBlueOver := myBlue
-			}
+		}
 
 		if (myRedUnder > -1)
 		myRed := myRedUnder
@@ -454,7 +557,6 @@ GuiControlGet, tmp,, TransIntensity
 
 	GuiControl, +Background%hexCol%, Colour
 	GuiControl, +C%hexCol%, Colour
-	}
 
 Return
 transColOver:
@@ -470,8 +572,7 @@ GuiControlGet, tmp,, TransIntensity
 	GuiControl,, TransIntensity, % myTransIntensityOver
 	}
 
-	if (!useLayering)
-	{
+
 	GuiControlGet, tmp,, myHex
 	hexColUnder := tmp
 		if (hexColOver > -1)
@@ -514,7 +615,7 @@ GuiControlGet, tmp,, TransIntensity
 
 	GuiControl, +Background%hexCol%, Colour
 	GuiControl, +C%hexCol%, Colour
-	}
+
 
 Return
 
@@ -529,6 +630,16 @@ Gui, Submit, Nohide
 Return
 SOExample:
 Gui, Submit, Nohide
+	if (SOExample)
+	{
+	targWidth := htmlW
+	targHeight := htmlH
+	}
+	else
+	{
+	targWidth := guiWidth
+	targHeight := guiHeight
+	}
 Return
 listVarz:
 Gui, Submit, Nohide
@@ -615,6 +726,7 @@ GuiControlGet, tmp,, %useTransparencyHwnd%
 	}
 	
 GuiControlGet, tmp,, %useTransColorHwnd%
+
 	if (tmp)
 	{
 		if (myTransIntensityUnder = 255)
@@ -654,16 +766,18 @@ Gui GUI_Underlay: Show, Hide
 	if (GUI_Overlay_hwnd)
 	Gui GUI_Overlay: Show, Hide
 
-WinMove, ahk_id%GUI_Underlay_hwnd%, , %PositionX%, %PositionY%, %htmlW%, %htmlH%
+
+WinMove, ahk_id%GUI_Underlay_hwnd%, , % A_ScreenWidth/4, % A_ScreenHeight/5, %targWidth%, %targHeight%
 GuiControlGet, tmp,, %useActiveXHwnd%
+GuiControlGet, SOExample,, %SOExampleHwnd%
 
 	if (tmp)
-	ProcessControls(GUI_Underlay_hwnd, SOExample, htmlW, htmlH)
+	ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight, 1)
 	else
 	{
 	GuiControlGet, tmp,, %useImageHwnd%
 		if (tmp)
-		ProcessControls(GUI_Underlay_hwnd, SOExample)
+		ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight)
 	}
 
 sleep, 30
@@ -764,10 +878,10 @@ outStr := % "Containing GUI_Underlay_hwnd`: " . Format("{1:i}", GUI_Underlay_hwn
 		}
 		; Assume childhWnd is the only candidate for hdc_bmp
 		if (!hdc_bmp)
-		{
-		tmp := DllCall("GetDC", "uint", childhWnd)   ;get device context for picture
-		hdc_bmp := DllCall("CreateCompatibleDC", "Uint", tmp)
-		}
+		hdc_bmp := DllCall("GetDC", "uint", childhWnd)   ;get device context for picture
+		if (!screenDC)
+		screenDC := DllCall("GetDC", "UInt", 0)
+
 	GuiControlGet, tmp,, %childhWnd%
 	;if (dw_ExStyle)
 
@@ -779,8 +893,6 @@ outStr := % "Containing GUI_Underlay_hwnd`: " . Format("{1:i}", GUI_Underlay_hwn
 	childhWndArray := WinEnum(childhWnd)
 
 
-	;msgbox % " outStr " outStr " `nA_Index " A_Index "  OutputVar "  OutputVar " childhWndArray[0] " childhWndArray[0] " childhWndArray[1] " childhWndArray[1] " childhWndArray[2] " childhWndArray[2]
-	;msgbox % " outStr " outStr " `nA_Index " A_Index "  OutputVar "  OutputVar " hWndArray[1] " hWndArray[1] " hWndArray[2] " hWndArray[2]
 
 
 		if (childhWndArray[1])
@@ -844,28 +956,22 @@ GuiControlGet, tmp,, %listVarzHwnd%
 	if (WinExist("ahk_id " GUI_Overlay_hwnd))
 	{
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, WS_EX_LAYERED, myTransIntensityUnder)
+		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, -1)
 	Gui GUI_Underlay: Show
 	WinGetPos, x, y, w, h, ahk_id %GUI_Underlay_hwnd%
 	WinMove, ahk_id %GUI_Overlay_hwnd%, , %x%, %y%, %w%, %h%
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Overlay_hwnd, hdc_bmp, WS_EX_LAYERED, myTransIntensityOver)
+		ProcessLayers(GUI_Overlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityOver, -2)
 	Gui GUI_Overlay:Show, NoActivate
 	}
 	else
 	{
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, WS_EX_LAYERED, myTransIntensityUnder)
+		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, -1)
 	Gui GUI_Underlay: Show
 	}
 
-	if (hdc_bmp && !(CS_OWNDC & Obj.ObjStyle()) && !(CS_CLASSDC & Obj.ObjStyle()))
-	{
-		if (!DllCall("ReleaseDC", "UInt", childhWnd, "UInt", hdc_bmp))
-		msgbox DC not Released!
-	Sleep 10
-	hdc_bmp := 0
-	}
+
 ; https://www.codeproject.com/Articles/2078/Guide-to-WIN32-Paint-for-Intermediates
 
 
@@ -925,14 +1031,14 @@ Gui GUI_Underlay: Show
 return
 
 
-ProcessControls(GUI_Underlay_hwnd, SOExample, htmlW := 0, htmlH := 0)
+ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight, HTML := 0)
 {
 Static WB
 
 
-	if (HtmlW)
+	if (HTML)
 	{
-	Gui GUI_Underlay: Add, ActiveX, w%htmlW% h%htmlH% vWB, Shell.Explorer
+	Gui GUI_Underlay: Add, ActiveX, w%targWidth% h%targHeight% vWB, Shell.Explorer
 
 
 
@@ -1006,9 +1112,8 @@ Static WB
 		}
 		else
 		{
-		;tmp = http://www.ozemail.com.au/~lmstearn/files/TranspTester.jpg
-		tmp = https://github.com/lmstearn/TranspTester/blob/master/TranspTester.JPG
-		tmp1 = TranspTester.jpg
+		tmp = https://raw.githubusercontent.com/lmstearn/TranspTester/master/TranspTester.bmp
+		tmp1 = TranspTester.bmp
 		}
 
 		try
@@ -1019,18 +1124,22 @@ Static WB
 		{
 		msgbox, 8208, FileDownload, Error with the bitmap download!`nSpecifically: %e%
 		}
-	FileGetSize, tmp , A_ScriptDir . "`\" . %tmp1%
+
+	FileGetSize, tmp , % A_ScriptDir . "`\" . tmp1
 		if tmp < 1000
 		msgbox, 8208, FileDownload, File size is incorrect!
+		sleep 300
+		tmp1 := A_ScriptDir . "`\" . tmp1
 
-		if Winexist(A_ScriptDir . "`\" . tmp1)
-		tmp := (LoadPicture(A_ScriptDir . "`\" . tmp1, w%htmlW% h%htmlH% GDI+))
+		if Fileexist(tmp1)
+		tmp := LoadPicture(tmp1, GDI+ w%targWidth% h%targHeight%)
 		else
 		{
 		sleep 300
-		tmp := (LoadPicture(A_ScriptDir . "`\" . tmp1, w%htmlW% h%htmlH% GDI+))
+		tmp := LoadPicture(tmp1, GDI+ w%targWidth% h%targHeight%)
 		}
-	Gui GUI_Underlay: Add, Picture, w-1 h-1, % "HBITMAP:*" tmp
+ 
+	Gui GUI_Underlay: Add, Picture, , % "HBITMAP:*" tmp
 	DllCall("DeleteObject", "ptr", tmp)
 
 	}
@@ -1201,6 +1310,15 @@ GuiClose:
 GUI_OverlayGuiClose:
 GUI_UnderlayGuiClose:
 
+formShowing := 0
+	if (hdc_bmp && !(CS_OWNDC & Obj.ObjStyle()) && !(CS_CLASSDC & Obj.ObjStyle()))
+	{
+		if (!DllCall("ReleaseDC", "UInt", childhWnd, "UInt", hdc_bmp))
+		msgbox hdc_bmp not Released!
+	Sleep 10
+	hdc_bmp := 0
+	}
+
 GuiControlGet, tmp,, %quitHwnd%
 	if (tmp = "Cancel")
 	{
@@ -1215,7 +1333,7 @@ GuiControlGet, tmp,, %quitHwnd%
 		GuiControl, text, %goHwnd%, &Go
 		Gui GUI_Underlay:Destroy
 		}
-	ProcessLayers(tmp, tmp, tmp, tmp, -1)
+	ProcessLayers(tmp, tmp, tmp, tmp, tmp)
 	GuiControl, enable, %goHwnd%
 	GuiControl, text, %quitHwnd%, &Quit
 	Return
@@ -1226,130 +1344,96 @@ GuiControlGet, tmp,, %quitHwnd%
 	Gui GUI_Underlay:Destroy
 	}
 
+	if (screenDC && !DllCall("ReleaseDC", "UInt", 0, "UInt", screenDC))
+	msgbox screenDC not Released!
+
+
+
 if (FileExist(A_ScriptDir "`\overlay.html"))
 FileDelete, % A_ScriptDir "`\overlay.html"
 if (FileExist(A_ScriptDir "`\FBZq5.png"))
 FileDelete, % A_ScriptDir "`\FBZq5.png"
-if (FileExist(A_ScriptDir "`\TranspTester.JPG"))
-FileDelete, % A_ScriptDir "`\TranspTester.JPG"
+if (FileExist(A_ScriptDir "`\TranspTester.bmp"))
+FileDelete, % A_ScriptDir "`\TranspTester.bmp"
 ExitApp
 
-ProcessLayers(hwnd, hdc_bmp, WS_EX_LAYERED, SourceConstantAlpha, UpdateLayer := 0, x := 0, y := 0, w := 0, h := 0)
+ProcessLayers(hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, SourceConstantAlpha, UpdateLayer := 0, x := 0, y := 0, w := 0, h := 0)
 {
 
-Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, screenDC, secondCallUpdate
+Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayered
 
-if (UpdateLayer = -1)
-{
-;Cleanup
-VarSetCapacity(CHROMA_KEY, 0)
-Return
-}
+;UpdateLayer: 0 cleanup. -1 (underlay), -2 (overlay) initialise, 1 (underlay) 2 (overlay) update
+	if (!UpdateLayer)
+	{
+	;Cleanup
+	VarSetCapacity(CHROMA_KEYU, 0)
+	VarSetCapacity(CHROMA_KEYO, 0)
+	AC_SRC_ALPHA := 0x0, AC_SRC_OVER := 0
+	ULW_COLORKEY := 0x0, ULW_ALPHA := 0x0
+	Return
+	}
 
-	if (!AC_SRC_ALPHA)
+	if (UpdateLayer < 0)
 	{
 	AC_SRC_ALPHA := 0x01, AC_SRC_OVER := 0 ; 32bpp
 	ULW_COLORKEY := 0x00000001, ULW_ALPHA := 0x00000002
-
-	screenDC := 0
-
+	hdcLayered := 0
 	;Chroma_Key is a colorref structure: https://docs.microsoft.com/en-us/windows/desktop/gdi/colorref
 	;When specifying an explicit RGB color, the COLORREF value has the following hexadecimal form: 0x00bbggrr
-	VarSetCapacity(CHROMA_KEY, 4 + A_PtrSize, 0)
-	COLORREF := 0x00000000
+	(UpdateLayer = 1)? (VarSetCapacity(CHROMA_KEYU, 4 + A_PtrSize, 0)): (VarSetCapacity(CHROMA_KEYO, 4 + A_PtrSize, 0))
+	;COLORREF := SourceConstantAlpha
+	;COLORREF := WRONG
 	lpCOLORREF := &COLORREF
 	lpCOLORREF := strget(lpCOLORREF)
-	NumPut(COLORREF, CHROMA_KEY, 0, "Uint") 
-	NumPut(lpCOLORREF, CHROMA_KEY, A_PtrSize, "UPtr") 
-	}
+	NumPut(COLORREF, (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), 0, "Uint") 
+	NumPut(lpCOLORREF,(UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), A_PtrSize, "UPtr")
 
-if (UpdateLayer)
-{
+	;hdc_dib := DllCall("CreateCompatibleDC", "Uint", screenDC) ; not requ'd
+	;DllCall("CreateCompatibleBitmap", UInt,screenDC, Int,w, Int,h)
 
-hdcLayered := 0
 
-WinSet, ExStyle, -%WS_EX_LAYERED%,  % "ahk_id" hwnd
-Sleep 3
-WinSet, ExStyle, +%WS_EX_LAYERED%,  % "ahk_id" hwnd
-
-Ptr := (A_PtrSize == 8) ? "UPtr" : "UInt"
-
-VarSetCapacity(pt, 8)
-NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
-	if (!w || !h)
-	WinGetPos, , , w, h, % "ahk_id" hwnd
-VarSetCapacity(sz, 8), NumPut(w, sz, 0, "UInt"), NumPut(h, sz, 4, "UInt")
-VarSetCapacity(bl, 8), NumPut(AC_SRC_OVER, bl, 0, "Char"), NumPut(0, bl, 1, "Char"), NumPut(SourceConstantAlpha, bl, 2, "Char"), NumPut(w, bl, 3, "Char") ;Blendfunction
-
-;Function has to be called twice to fill screenDC
-
-	if (secondCallUpdate)
-	{
-	; screenDC initialised
-		if (!DllCall("UpdateLayeredWindow", "Ptr", hwnd
-		, "Ptr", screenDC
-		, "Ptr", (!x && !y) ? 0 : &pt
-		, "Ptr", (!w || !h) ? 0 : &sz
-		, "Ptr", hdc_bmp
-		, "Ptr", hdcLayered
-		, "Ptr", &CHROMA_KEY
-		, "Ptr", &bl
-		, "UInt", ULW_ALPHA))
-		msgbox % "UpdateLayeredWindow Failed!"
-
+	;Note that once SetLayeredWindowAttributes has been called for a layered window, subsequent UpdateLayeredWindow calls will fail until the layering style bit is cleared and set again.
+		Try
+		{
+		DllCall("SetLayeredWindowAttributes", "Ptr", hWnd, "Ptr", (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), "Char", SourceConstantAlpha, "UInt", ULW_COLORKEY|ULW_ALPHA)
+		}
+		Catch e
+		{
+		msgbox % "SetLayeredWindowAttributes Failed: error " e " or " DllCall("GetLastError") " hWnd " hWnd " &CHROMA_KEY " &CHROMA_KEY " SourceConstantAlpha " SourceConstantAlpha " ULW_COLORKEY|ULW_ALPHA " ULW_COLORKEY|ULW_ALPHA
+		}
+	;Note: Remove ULW_COLORKEY so that CHROMA_KEY is ignored
 	}
 	else
 	{
+
+	; "the layering style bit is cleared and set again"
+	WinSet, ExStyle, -%WS_EX_LAYERED%,  % "ahk_id" hwnd
+
+	WinSet, ExStyle, +%WS_EX_LAYERED%,  % "ahk_id" hwnd
+
+	Ptr := (A_PtrSize == 8) ? "UPtr" : "UInt"
+
+	VarSetCapacity(pt, 8)
+	NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
+		if (!w || !h)
+		WinGetPos, , , w, h, % "ahk_id" hwnd
+	VarSetCapacity(sz, 8), NumPut(w, sz, 0, "UInt"), NumPut(h, sz, 4, "UInt")
+	VarSetCapacity(bl, 8), NumPut(AC_SRC_OVER, bl, 0, "Char"), NumPut(0, bl, 1, "Char"), NumPut(SourceConstantAlpha, bl, 2, "Char"), NumPut(w, bl, 3, "Char") ;Blendfunction
+
+
 		if (!DllCall("UpdateLayeredWindow", "Ptr", hwnd
 		, "Ptr", screenDC
 		, "Ptr", (!x && !y) ? 0 : &pt
 		, "Ptr", (!w || !h) ? 0 : &sz
 		, "Ptr", hdc_bmp
 		, "Ptr", hdcLayered
-		, "Ptr", &CHROMA_KEY
+		, "Ptr", (UpdateLayer = 1)? &CHROMA_KEYU: &CHROMA_KEYO
 		, "Ptr", &bl
 		, "UInt", ULW_ALPHA))
 		msgbox % "UpdateLayeredWindow Failed!"
-		else
-		{
-			if (screenDC)
-			{
-			; hdcLayered is zero if shape and visual context of the window are not changing
-				if (!DllCall("UpdateLayeredWindow", "Ptr", hwnd
-				, "Ptr", screenDC
-				, "Ptr", (!x && !y) ? 0 : &pt
-				, "Ptr", (!w || !h) ? 0 : &sz
-				, "Ptr", hdc_bmp
-				, "Ptr", hdcLayered
-				, "Ptr", &CHROMA_KEY
-				, "Ptr", &bl
-				, "UInt", ULW_ALPHA))
-				msgbox % "UpdateLayeredWindow Failed!"
-			}
-			else
-			msgbox % "Could not get handle for UpdateLayeredWindow DC!"
-		}
+
 	}
-
 }
-else
-{
-
-
-;Note that once SetLayeredWindowAttributes has been called for a layered window, subsequent UpdateLayeredWindow calls will fail until the layering style bit is cleared and set again.
-Try
-{
-DllCall("SetLayeredWindowAttributes", "Ptr", hWnd, "Ptr", &CHROMA_KEY, "Char", SourceConstantAlpha, "UInt", ULW_COLORKEY|ULW_ALPHA)
-}
-Catch e
-{
-msgbox % "SetLayeredWindowAttributes Failed: error " e " or " DllCall("GetLastError") " hWnd " hWnd " &CHROMA_KEY " &CHROMA_KEY " SourceConstantAlpha " SourceConstantAlpha " ULW_COLORKEY|ULW_ALPHA " ULW_COLORKEY|ULW_ALPHA
-}
-}
-;Note: Remove ULW_COLORKEY so that CHROMA_KEY is ignored
-
-}
-
 /*
  * Function: WinEnum
  *     Wrapper for Enum(Child)Windows [http://goo.gl/5eCy9 | http://goo.gl/FMXit]
@@ -1586,7 +1670,6 @@ Return
 			else
 			{
 				if (currentPos > 255 - 8)
-				;msgbox % " mX " mX " cX " cX " cWidth " cWidth " currentPos " currentPos " mControl " mControl
 				currentPos := 255
 			}
 		SetTimer, Transpt, -1
@@ -1599,7 +1682,6 @@ Return
 			else
 			{
 				if (currentPos > 255 - 8)
-				;msgbox % " mX " mX " cX " cX " cWidth " cWidth " currentPos " currentPos " mControl " mControl
 				currentPos := 255
 			}
 		If (inStr(tmp, "Transpt"))
@@ -1634,9 +1716,9 @@ if MouseIsOverTitlebar()
 				{
 				WinGetPos, x, y, w, h, ahk_id %GUI_Underlay_hwnd%
 					if (GUI_Overlay_hwnd)
-					ProcessLayers(GUI_Overlay_hwnd, hdc_bmp, WS_EX_LAYERED, myTransIntensityOver, 1, x, y, w, h)
+					ProcessLayers(GUI_Overlay_hwnd, 0, 0, WS_EX_LAYERED, myTransIntensityOver, 2, x, y, w, h)
 					else
-					ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, WS_EX_LAYERED, myTransIntensityUnder, 1, x, y, w, h)
+					ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, 1, x, y, w, h)
 				}
 				else
 				{
@@ -1679,12 +1761,24 @@ MouseIsOverTitlebar()
 {
 ;https://autohotkey.com/board/topic/82066-minimize-by-right-click-titlebar-close-by-middle-click/
     static WM_NCHITTEST := 0x84, HTCAPTION := 2
+	tmp := A_CoordModeMouse
     CoordMode Mouse, Screen
     MouseGetPos x, y, w
+	CoordMode, Mouse, % tmp
     if WinExist("ahk_class Shell_TrayWnd ahk_id " w)  ; Exclude taskbar.
         return false
 
     SendMessage WM_NCHITTEST,, x | (y << 16),, ahk_id %w%
     WinExist("ahk_id " w)  ; Set Last Found Window for convenience.
     return ErrorLevel = HTCAPTION
+}
+GuiGetSize(ByRef W, ByRef H, TranspTesterHwnd)
+{
+	If WinExist("ahk_id " TranspTesterHwnd)
+	{
+		VarSetCapacity(rect, 16, 0)
+		DllCall("GetClientRect", uint, TranspTesterHwnd, uint, &rect)
+		W := NumGet(rect, 8, "int")
+		H := NumGet(rect, 12, "int")
+	}
 }
