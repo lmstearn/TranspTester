@@ -27,8 +27,12 @@ myGreenTransCol := -1
 myBlueTransCol := -1
 myTranspUnder := 0
 myTranspOver := -1
-myTransIntensityUnder := 0
-myTransIntensityOver := 0
+myTransIntensityUnder := -1
+myTransIntensityOver := -1
+myTransIntensityUnderTransCol := -1
+myTransIntensityUnderLayer := -1
+myTransIntensityOverTransCol := -1
+myTransIntensityOverLayer := -1
 formShowing := 0
 mouseSlide := 0
 mouseDelay := 0
@@ -135,6 +139,7 @@ GuiControl,, useImage, 1
 
 Gui, Add, Checkbox, vuseOverlay guseOverlay HWNDuseOverlayHwnd, Use Overlay
 
+
 Gui, Add, Radio, ys vuseTransColor guseTransColor HWNDuseTransColorHwnd, Use TransColor
 Gui, Add, Radio, vuseLayered guseLayered HWNDuseLayeredHwnd, Use Layering
 Gui, Add, Radio, vuseNeither guseNeither HWNDuseNeitherHwnd, Use Neither
@@ -215,6 +220,8 @@ enableTranspCtrls(ByRef myTranspUnder, ByRef myTranspOver, overlayWindow, ctrlEn
 		GuiControl, +Range0-255, Transpt
 			if (!overlayWindow)
 			GuiControl,, transUnd, 1
+
+		GuiControl, enable, useOverlay
 		}
 		else
 		{
@@ -228,6 +235,10 @@ enableTranspCtrls(ByRef myTranspUnder, ByRef myTranspOver, overlayWindow, ctrlEn
 
 		GuiControl,, myTransp, % myTranspUnder
 		GuiControl, +Range0-0, Transpt
+
+		GuiControlGet, tmp,, useNeither
+			if (tmp)
+			GuiControl, Disable, useOverlay
 		}
 }
 ctrlMast(ctrlEnable, isLayered)
@@ -251,14 +262,25 @@ global
 		GuiControlGet, myBlueUnder,, myBlue
 		myBlueTransCol := myBlueUnder
 		}
+		if (hexColUnder > -1)
+		{
+		GuiControlGet, hexColUnder,, myHex
+		hexColTransCol := hexColUnder
+		}
 
-	GuiControlGet, hexColUnder,, myHex
-	hexColTransCol := hexColUnder
+		if (myTransIntensityUnder > -1)
+		{
+		GuiControlGet, myTransIntensityUnder,, transColIntensity
+		myTransIntensityUnderTransCol := myTransIntensityUnder
+		}
 
-	if (!ctrlEnable)
-	Return
 
-	hexColUnder := hexColLayer
+		if (!ctrlEnable)
+		Return
+
+	
+	(myTransIntensityUnderLayer = -1)? (myTransIntensityUnder := 0): myTransIntensityUnder := myTransIntensityUnderLayer
+	(hexColLayer = -1)? (hexColUnder := 0xFFFFFF): hexColUnder := hexColLayer
 	(myRedLayer = -1)? (myRedUnder := 255): myRedUnder := myRedLayer
 	(myGreenLayer = -1)? (myGreenUnder := 255): myGreenUnder := myGreenLayer
 	(myBlueLayer = -1)? (myBlueUnder := 255): myBlueUnder := myBlueLayer
@@ -284,11 +306,23 @@ global
 		myBlueLayer := myBlueUnder
 		}
 
-	GuiControlGet, hexColUnder,, myHex
-	hexColLayer := hexColUnder
-	if (!ctrlEnable)
-	Return
-	hexColUnder := hexColTransCol
+		if (hexColUnder > -1)
+		{
+		GuiControlGet, hexColUnder,, myHex
+		hexColLayer := hexColUnder
+		}
+
+		if (myTransIntensityUnder > -1)
+		{
+		GuiControlGet, myTransIntensityUnder,, transColIntensity
+		myTransIntensityUnderLayer := myTransIntensityUnder
+		}
+
+		if (!ctrlEnable)
+		Return
+
+	(myTransIntensityUnderTransCol = -1)? (myTransIntensityUnder := 0): myTransIntensityUnder := myTransIntensityUnderTransCol
+	(hexColTransCol = -1)? (hexColUnder := 0xFFFFFF): hexColUnder := hexColTransCol
 	(myRedTransCol = -1)? (myRedUnder := 255): myRedUnder := myRedTransCol
 	(myGreenTransCol = -1)? (myGreenUnder := 255): myGreenUnder := myGreenTransCol
 	(myBlueTransCol = -1)? (myBlueUnder := 255): myBlueUnder := myBlueTransCol
@@ -329,22 +363,22 @@ global
 	GuiControl, %enable%, useOverlay
 		if (ctrlEnable)
 		{
-			if (overlayWindow)
-			{
-tmp := tmp
-			}
-			else
+			if (!overlayWindow)
 			{
 				; Clicked from either Transcol or Layered
 				if (ctrlEnable = 2)
 				{
 				GuiControl, +Range0-255, myRed
-				GuiControl, , myRed, % (myRedUnder = -1)? 255: myRedUnder
 				GuiControl, +Range0-255, myGreen
-				GuiControl, , myGreen, % (myGreenUnder = -1)? 255: myGreenUnder
 				GuiControl, +Range0-255, myBlue
-				GuiControl, , myBlue, % (myBlueUnder = -1)? 255: myBlueUnder
 				GuiControl, +Range0-255, transColIntensity
+				GuiControl, , myRed, % (myRedUnder = -1)? 255: myRedUnder
+				GuiControl, , myGreen, % (myGreenUnder = -1)? 255: myGreenUnder
+				GuiControl, , myBlue, % (myBlueUnder = -1)? 255: myBlueUnder
+				GuiControl, , transColIntensity, % (myTransIntensityUnder = -1)? 0: myTransIntensityUnder
+				GuiControl, , transIntensity, % (myTransIntensityUnder = -1)? 0: myTransIntensityUnder
+				GuiControl, , myHex, % (hexColUnder = -1)? 0xFFFFFF: hexColUnder
+				GuiControl,, transColUnd, 1
 				}
 				else
 				{
@@ -357,14 +391,16 @@ tmp := tmp
 					GuiControl, , myRed, %myRedUnder%
 					GuiControl, , myGreen, %myGreenUnder%
 					GuiControl, , myBlue, %myBlueUnder%
+					GuiControl,, transIntensity, %myTransIntensityUnder%
+					GuiControl, , transColIntensity, %myTransIntensityUnder%
+					GuiControl,, myHex, % hexColUnder
 					}
-					else
-					msgbox Should never get here!
+					; else just deselcecting useOverlay
 				}
 
-			GuiControl,, myHex, % hexColUnder
+
 			GuiControl, +Background%hexColUnder%, Colour
-			myTransIntensityOver := 0
+			myTransIntensityOver := -1
 
 			hexColOver := -1
 			}
@@ -373,28 +409,24 @@ tmp := tmp
 		{
 			if (overlayWindow)
 			{
-			myTransIntensityOver := 0
+			myTransIntensityOver := -1
 			hexColOver := -1
-				if (!myTransIntensityUnder)
-				{
-				hexCol := hexColUnder
-				GuiControlGet, transColIntensity,, transColIntensity
-				myTransIntensityUnder := transColIntensity
-				}
 			}
-			else
-			{
-				hexCol := 0xFFFFFF
-			}
+		hexCol := 0xFFFFFF
+
+
 
 		GuiControl,, myHex, % hexCol
-		hexColUnder := hexCol
+		hexColUnder := -1
 		
 		GuiControl, +Background%hexCol%, Colour
 		GuiControl, +C%hexCol%, Colour
 		GuiControl, +Range0-0, myRed
 		GuiControl, +Range0-0, myGreen
 		GuiControl, +Range0-0, myBlue
+		GuiControl,, transIntensity, 0
+		GuiControl,, transColIntensity, 0
+		myTransIntensityUnder := -1
 		myRedUnder := -1
 		myGreenUnder := -1
 		myBlueUnder := -1
@@ -411,16 +443,12 @@ tmp := tmp
 
 
 
-	if (myTransIntensityOver)
+	if (myTransIntensityOver > -1)
 	{
 	GuiControl,, TransIntensity, % myTransIntensityOver
 	GuiControl,, TransColIntensity, % myTransIntensityOver
 	}
-	else
-	{
-	GuiControl,, TransIntensity, % myTransIntensityUnder
-	GuiControl,, TransColIntensity, % myTransIntensityUnder
-	}
+
 }
 
 useOverlay:
@@ -460,6 +488,9 @@ Return
 useNeither:
 Gui, Submit, Nohide
 enableTransColorCtrls()
+GuiControlGet, tmp,, useTransparency
+	if (tmp)
+	GuiControl, enable, useOverlay
 Return
 
 useTransparency:
@@ -501,9 +532,9 @@ Return
 transColUnd:
 Gui, Submit, Nohide
 
-GuiControlGet, tmp,, TransIntensity
+GuiControlGet, tmp,, transIntensity
 
-	if (overlayWindow && myTransIntensityOver > -1)
+	if (overlayWindow)
 	myTransIntensityOver := tmp
 
 	if (myTransIntensityUnder > -1)
@@ -511,7 +542,6 @@ GuiControlGet, tmp,, TransIntensity
 	GuiControl,, transColIntensity, % myTransIntensityUnder
 	GuiControl,, TransIntensity, % myTransIntensityUnder
 	}
-
 
 	GuiControlGet, tmp,, myHex
 	hexColOver := tmp
@@ -562,16 +592,14 @@ Return
 transColOver:
 Gui, Submit, Nohide
 
-GuiControlGet, tmp,, TransIntensity
-
-	myTransIntensityUnder := tmp
+GuiControlGet, tmp,, transIntensity
+myTransIntensityUnder := tmp
 
 	if (myTransIntensityOver > -1)
 	{
 	GuiControl,, transColIntensity, % myTransIntensityOver
-	GuiControl,, TransIntensity, % myTransIntensityOver
+	GuiControl,, transIntensity, % myTransIntensityOver
 	}
-
 
 	GuiControlGet, tmp,, myHex
 	hexColUnder := tmp
@@ -637,8 +665,8 @@ Gui, Submit, Nohide
 	}
 	else
 	{
-	targWidth := guiWidth
-	targHeight := guiHeight
+	targWidth := floor((306/372) * guiWidth)
+	targHeight := floor((350/425) * guiHeight)
 	}
 Return
 listVarz:
@@ -655,23 +683,23 @@ GuiControl, text, %quitHwnd%, Cancel
 	if (OverlayVisible)
 	{
 	GuiControl, disable, %goHwnd%
+	formShowing := 1
 	Gosub F1
 	return
 	}
 GuiControlGet, tmp,, %useTransColorHwnd%
 	if (tmp || useLayering)
 	{
+
 	GuiControlGet, tmp,, transColOver
 		if (tmp)
 		{
+
 		GuiControlGet, tmp,, TransIntensity
 		myTransIntensityOver := tmp
 
-			if (!useLayering)
-			{
-			GuiControlGet, tmp,, myHex
-			hexColOver := tmp
-			}
+		GuiControlGet, tmp,, myHex
+		hexColOver := tmp
 		}
 		else
 		{
@@ -680,13 +708,11 @@ GuiControlGet, tmp,, %useTransColorHwnd%
 			if (myTransIntensityOver = -1)
 			myTransIntensityOver := 0
 
-			if (!useLayering)
-			{
-			GuiControlGet, tmp,, myHex
-			hexColUnder := tmp
-				if (hexColOver = -1)
-				hexColOver := 0xFFFFFF
-			}
+		GuiControlGet, tmp,, myHex
+		hexColUnder := tmp
+			if (hexColOver = -1)
+			hexColOver := 0xFFFFFF
+
 		}
 	}
 
@@ -820,6 +846,7 @@ F1::
 	Return
 tmp := A_DetectHiddenWindows
 DetectHiddenWindows, Off
+
 if (!WinExist("ahk_id " GUI_Underlay_hwnd) && !formShowing)
 {
 DetectHiddenWindows, %tmp%
@@ -956,18 +983,18 @@ GuiControlGet, tmp,, %listVarzHwnd%
 	if (WinExist("ahk_id " GUI_Overlay_hwnd))
 	{
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, -1)
+		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, hexColUnder, -1)
 	Gui GUI_Underlay: Show
 	WinGetPos, x, y, w, h, ahk_id %GUI_Underlay_hwnd%
 	WinMove, ahk_id %GUI_Overlay_hwnd%, , %x%, %y%, %w%, %h%
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Overlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityOver, -2)
+		ProcessLayers(GUI_Overlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityOver, hexColOver, -2)
 	Gui GUI_Overlay:Show, NoActivate
 	}
 	else
 	{
 		if (useLayering && hdc_bmp)
-		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, -1)
+		ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, hexColUnder, -1)
 	Gui GUI_Underlay: Show
 	}
 
@@ -1187,7 +1214,7 @@ FileAppend,
 Return
 Sub_BuildHTML:
 FileDelete, overlay.html
-;Original URL of image: http://i.stack.imgur.com/FBZq5.png
+
 FileAppend,
 (
 	<!DOCTYPE html>
@@ -1333,7 +1360,7 @@ GuiControlGet, tmp,, %quitHwnd%
 		GuiControl, text, %goHwnd%, &Go
 		Gui GUI_Underlay:Destroy
 		}
-	ProcessLayers(tmp, tmp, tmp, tmp, tmp)
+	ProcessLayers(tmp, tmp, tmp, tmp, tmp, tmp)
 	GuiControl, enable, %goHwnd%
 	GuiControl, text, %quitHwnd%, &Quit
 	Return
@@ -1357,7 +1384,7 @@ if (FileExist(A_ScriptDir "`\TranspTester.bmp"))
 FileDelete, % A_ScriptDir "`\TranspTester.bmp"
 ExitApp
 
-ProcessLayers(hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, SourceConstantAlpha, UpdateLayer := 0, x := 0, y := 0, w := 0, h := 0)
+ProcessLayers(hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, SourceConstantAlpha, hexColour, UpdateLayer := 0, x := 0, y := 0, w := 0, h := 0)
 {
 
 Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayered
@@ -1381,8 +1408,7 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 	;Chroma_Key is a colorref structure: https://docs.microsoft.com/en-us/windows/desktop/gdi/colorref
 	;When specifying an explicit RGB color, the COLORREF value has the following hexadecimal form: 0x00bbggrr
 	(UpdateLayer = 1)? (VarSetCapacity(CHROMA_KEYU, 4 + A_PtrSize, 0)): (VarSetCapacity(CHROMA_KEYO, 4 + A_PtrSize, 0))
-	;COLORREF := SourceConstantAlpha
-	;COLORREF := WRONG
+	COLORREF := hexColour
 	lpCOLORREF := &COLORREF
 	lpCOLORREF := strget(lpCOLORREF)
 	NumPut(COLORREF, (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), 0, "Uint") 
@@ -1401,12 +1427,12 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 		{
 		msgbox % "SetLayeredWindowAttributes Failed: error " e " or " DllCall("GetLastError") " hWnd " hWnd " &CHROMA_KEY " &CHROMA_KEY " SourceConstantAlpha " SourceConstantAlpha " ULW_COLORKEY|ULW_ALPHA " ULW_COLORKEY|ULW_ALPHA
 		}
-	;Note: Remove ULW_COLORKEY so that CHROMA_KEY is ignored
+	;Note: It's possible to remove ULW_COLORKEY so that CHROMA_KEY is ignored
 	}
 	else
 	{
 
-	; "the layering style bit is cleared and set again"
+	; Calls fail unless "the layering style bit is cleared and set again"
 	WinSet, ExStyle, -%WS_EX_LAYERED%,  % "ahk_id" hwnd
 
 	WinSet, ExStyle, +%WS_EX_LAYERED%,  % "ahk_id" hwnd
@@ -1716,9 +1742,9 @@ if MouseIsOverTitlebar()
 				{
 				WinGetPos, x, y, w, h, ahk_id %GUI_Underlay_hwnd%
 					if (GUI_Overlay_hwnd)
-					ProcessLayers(GUI_Overlay_hwnd, 0, 0, WS_EX_LAYERED, myTransIntensityOver, 2, x, y, w, h)
+					ProcessLayers(GUI_Overlay_hwnd, 0, 0, WS_EX_LAYERED, myTransIntensityOver, hexColOver, 2, x, y, w, h)
 					else
-					ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, 1, x, y, w, h)
+					ProcessLayers(GUI_Underlay_hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, myTransIntensityUnder, hexColUnder, 1, x, y, w, h)
 				}
 				else
 				{
