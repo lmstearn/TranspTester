@@ -100,11 +100,9 @@ WS_EX_TRANSPARENT := 0x00000020 ;The window should not be painted until siblings
 
 
 
-;Related Reading: https://docs.microsoft.com/en-us/windows/desktop/WinAuto/samples-entry
-
 
 WS_EX_LAYERED := 0x00080000
-; The window is a layered window. This style cannot be used if the window has a class style of either CS_OWNDC or CS_CLASSDC. However, Win 8 does support the WS_EX_LAYERED style for child windows, where previous Windows versions support it only for top-level windows.
+; "The window is a layered window. This style cannot be used if the window has a class style of either CS_OWNDC or CS_CLASSDC. However, Win 8 does support the WS_EX_LAYERED style for child windows, where previous Windows versions support it only for top-level windows."
 GW_CHILD := 0X05
 
 OverlayVisible := 0
@@ -119,9 +117,10 @@ tmp := 0
 controlW := floor(A_ScreenWidth/8)
 x := 0, y := 0, w := 0, h := 0
 
-; Helps with flickering on move
+; Helps with flickering on window move
 OnMessage(0x14, "WM_ERASEBKGND")
-; Move the window with this method produces excessive flickering- see WM_MOVE below
+
+; Move the window with the following called method produces excessive flickering
 ;Onmessage(0x03,"WM_MOVE")
 
 
@@ -361,6 +360,7 @@ global
 	GuiControl, %enable%, transIntensity
 	GuiControl, %enable%, transColIntensity
 	GuiControl, %enable%, useOverlay
+
 		if (ctrlEnable)
 		{
 			if (!overlayWindow)
@@ -378,7 +378,7 @@ global
 				GuiControl, , transColIntensity, % (myTransIntensityUnder = -1)? 0: myTransIntensityUnder
 				GuiControl, , transIntensity, % (myTransIntensityUnder = -1)? 0: myTransIntensityUnder
 				GuiControl, , myHex, % (hexColUnder = -1)? 0xFFFFFF: hexColUnder
-				GuiControl,, transColUnd, 1
+				GuiControl, , transColUnd, 1
 				}
 				else
 				{
@@ -395,7 +395,18 @@ global
 					GuiControl, , transColIntensity, %myTransIntensityUnder%
 					GuiControl,, myHex, % hexColUnder
 					}
-					; else just deselcecting useOverlay
+					; else: just deselecting useOverlay
+						if (GUI_Overlay_hwnd)
+						{
+						Gui GUI_Overlay:Destroy
+						sleep 100
+							; A worry- the message isn't posted until this thread exits.
+							if (GUI_Overlay_hwnd)
+							GUI_Overlay_hwnd := 0
+						OverlayVisible := 0
+						overlayWindow := 0
+						}
+				GuiControl, text, %goHwnd%, &Go
 				}
 
 
@@ -440,7 +451,6 @@ global
 		GuiControl,, transColUnd, 1
 		GuiControl, +Range0-0, transColIntensity
 		}
-
 
 
 	if (myTransIntensityOver > -1)
@@ -573,7 +583,7 @@ GuiControlGet, tmp,, transIntensity
 	tmp := Format("{:i}", hexRed)
 	tmp := 255 * (tmp/16711680)
 	GuiControl,, myRed, %tmp%
-	;ControlSend, msctls_trackbar321, {dadada}
+	;ControlSend, msctls_trackbar321, {da-da-de-da-da}
 
 	tmp := Format("{:i}", hexGreen)
 	tmp := 255 * (tmp/65280)
@@ -629,7 +639,6 @@ myTransIntensityUnder := tmp
 	tmp := Format("{:i}", hexRed)
 	tmp := 255 * (tmp/16711680)
 	GuiControl,, myRed, %tmp%
-	;ControlSend, msctls_trackbar321, {dadada}
 
 	tmp := Format("{:i}", hexGreen)
 	tmp := 255 * (tmp/65280)
@@ -705,14 +714,9 @@ GuiControlGet, tmp,, %useTransColorHwnd%
 		{
 		GuiControlGet, tmp,, TransIntensity
 		myTransIntensityUnder := tmp
-			if (myTransIntensityOver = -1)
-			myTransIntensityOver := 0
 
 		GuiControlGet, tmp,, myHex
 		hexColUnder := tmp
-			if (hexColOver = -1)
-			hexColOver := 0xFFFFFF
-
 		}
 	}
 
@@ -741,7 +745,7 @@ GuiControlGet, tmp,, %useTransparencyHwnd%
 	Gui GUI_Underlay: New, +OwnDialogs +%WS_OVERLAPPED% +HWNDGUI_Underlay_hwnd
 
 Gui GUI_Underlay: Margin, 0,0
-; +ToolWindow +LastFound 
+; considered +ToolWindow +LastFound 
 GuiControlGet, tmp,, %useTransparencyHwnd%
 	if (tmp)
 	{
@@ -784,7 +788,11 @@ GuiControlGet, tmp,, %useTransColorHwnd%
 			if (myTransIntensityOver = 255)
 			WinSet TransColor, Off, ahk_id%GUI_Overlay_hwnd%
 			else
-			WinSet TransColor, %hexColOver% %myTransIntensityOver%, ahk_id%GUI_Overlay_hwnd%
+			{
+			tmp := (hexColOver = -1)? 0xFFFFFF: hexColOver
+			tmp := " " . (myTransIntensityOver = -1)? 0: myTransIntensityOver
+			WinSet TransColor, %tmp%, ahk_id%GUI_Overlay_hwnd%
+			}
 		}
 	}
 
@@ -827,7 +835,9 @@ Global
 	if (getKeyState("LButton", "P")) && formShowing && useLayering
 	Return 1
 }
+
 /*
+; Include following for extra flicker on move
 WM_MOVE(wparam,lparam,msg)
 {
 Global
@@ -893,8 +903,7 @@ outStr := % "Containing GUI_Underlay_hwnd`: " . Format("{1:i}", GUI_Underlay_hwn
 
 	Loop
 	{
-	; The following nested structure should be put into a recursive routine for any number of descendants.
-	; strget get pointer
+	; Note for next version: The following nested structure should be put into a recursive routine for any number of descendants.
 
 	childhWnd := hWndArray[A_Index]
 		if (!childhWnd)
@@ -910,10 +919,9 @@ outStr := % "Containing GUI_Underlay_hwnd`: " . Format("{1:i}", GUI_Underlay_hwn
 		screenDC := DllCall("GetDC", "UInt", 0)
 
 	GuiControlGet, tmp,, %childhWnd%
-	;if (dw_ExStyle)
 
 
-	;WinGet, childhWndArray, ControlList, % "ahk_id" childhWnd
+	; consider WinGet, childhWndArray, ControlList, % "ahk_id" childhWnd
 	outStr .= "`n`nhWndArray[" . A_Index . "]: " . childhWnd . ", its text: " . tmp
 	outStr .= OutputStyles(childhWnd, hdc_bmp)
 
@@ -999,8 +1007,6 @@ GuiControlGet, tmp,, %listVarzHwnd%
 	}
 
 
-; https://www.codeproject.com/Articles/2078/Guide-to-WIN32-Paint-for-Intermediates
-
 
 DetectHiddenWindows, Off
 
@@ -1020,7 +1026,7 @@ OutputStyles(inhWnd, hdc_bmp := 0)
 	isText := dw_ExStyle & WS_EX_LTRREADING ;   = text/css
 
 	ControlGet, WindowControlStyle, Style,,, % "ahk_id" inhWnd
-	;Bitmap
+	; check bitmap style
 	isBmp := % dw_Style & SS_BITMAP
 	if (hdc_bmp)
 	outStr .= "`ndw_Style: " . dw_Style . " SS_BITMAP: " . SS_BITMAP . " isBmp: " . isBmp . " hdc_bmp: " . hdc_bmp . " WindowControlStyle: " . WindowControlStyle
@@ -1052,7 +1058,7 @@ if (!dllcall("RedrawWindow", Ptr, GUI_Underlay_hwnd, Ptr, 0, Ptr, 0, uint, RDW_E
 msgbox Redraw failed
 Gui GUI_Underlay: Show
 
-; Same as
+; Same as...
 ; WinGet, dw_ExStyle, ExStyle, ahk_id%GUI_Underlay_hwnd%
 ;SetWindowLong(GUI_Underlay_hwnd, GWL_EXSTYLE, dw_ExStyle & ~WS_EX_LAYERED);
 return
@@ -1081,6 +1087,7 @@ Static WB
 
 	FileRead, html, % URL
 
+	; considered...
 	;WB := ComObjCreate("InternetExplorer.Application")
 	;if (WB.Navigate(URL) != S_OK)
 	;Document.Open(URL)
@@ -1111,7 +1118,7 @@ Static WB
 	Document.Close(html)
 
 		if WB.ReadyState != 4
-		MsgBox Document not ready  ; Happens if we call WBGet()
+		MsgBox Document not ready  ; May happen if we call WBGet() above- but it can happen without it!
 	;MsgBox % Document.body.innerText " " Document.body.innerHTML
 
 	WB.Visible := true
@@ -1180,7 +1187,7 @@ WB.Navigate(URL)
 
 	if (WB.Navigate(URL) == s_OK)
 	{
-	;while try !(pdoc := WB.document)
+	; alterbative: while try !(pdoc := WB.document)
 		while WB.ReadyState != 4 || WB.document.readyState!="complete" || WB.busy
 		sleep 100
 	}
@@ -1354,11 +1361,13 @@ GuiControlGet, tmp,, %quitHwnd%
 		GuiControl, text, %goHwnd%, &Underlay
 		Gui GUI_Underlay: Show, Hide
 		Gui GUI_Overlay:Destroy
+		OverlayVisible := 1
 		}
 		else
 		{
 		GuiControl, text, %goHwnd%, &Go
 		Gui GUI_Underlay:Destroy
+		OverlayVisible := 0
 		}
 	ProcessLayers(tmp, tmp, tmp, tmp, tmp, tmp)
 	GuiControl, enable, %goHwnd%
@@ -1405,20 +1414,22 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 	AC_SRC_ALPHA := 0x01, AC_SRC_OVER := 0 ; 32bpp
 	ULW_COLORKEY := 0x00000001, ULW_ALPHA := 0x00000002
 	hdcLayered := 0
-	;Chroma_Key is a colorref structure: https://docs.microsoft.com/en-us/windows/desktop/gdi/colorref
+	;Chroma_KeyU is a colorref structure: https://docs.microsoft.com/en-us/windows/desktop/gdi/colorref
 	;When specifying an explicit RGB color, the COLORREF value has the following hexadecimal form: 0x00bbggrr
 	(UpdateLayer = 1)? (VarSetCapacity(CHROMA_KEYU, 4 + A_PtrSize, 0)): (VarSetCapacity(CHROMA_KEYO, 4 + A_PtrSize, 0))
 	COLORREF := hexColour
 	lpCOLORREF := &COLORREF
+	; get the pointer
 	lpCOLORREF := strget(lpCOLORREF)
 	NumPut(COLORREF, (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), 0, "Uint") 
 	NumPut(lpCOLORREF,(UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), A_PtrSize, "UPtr")
 
-	;hdc_dib := DllCall("CreateCompatibleDC", "Uint", screenDC) ; not requ'd
+	; not requ'd...
+	;hdc_dib := DllCall("CreateCompatibleDC", "Uint", screenDC) 
 	;DllCall("CreateCompatibleBitmap", UInt,screenDC, Int,w, Int,h)
 
 
-	;Note that once SetLayeredWindowAttributes has been called for a layered window, subsequent UpdateLayeredWindow calls will fail until the layering style bit is cleared and set again.
+	; "Note that once SetLayeredWindowAttributes has been called for a layered window, subsequent UpdateLayeredWindow calls will fail until the layering style bit is cleared and set again."
 		Try
 		{
 		DllCall("SetLayeredWindowAttributes", "Ptr", hWnd, "Ptr", (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), "Char", SourceConstantAlpha, "UInt", ULW_COLORKEY|ULW_ALPHA)
@@ -1456,7 +1467,7 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 		, "Ptr", (UpdateLayer = 1)? &CHROMA_KEYU: &CHROMA_KEYO
 		, "Ptr", &bl
 		, "UInt", ULW_ALPHA))
-		msgbox % "UpdateLayeredWindow Failed!"
+		msgbox % "UpdateLayeredWindow Failed!`nUpdateLayer is : " UpdateLayer ", SourceConstantAlpha is : " SourceConstantAlpha ", hexColour is: " hexColour,
 
 	}
 }
@@ -1487,6 +1498,7 @@ Result := DllCall("EnumChildWindows", UInt, Hwnd, UInt, EnumChildWindowsAddress,
 return out
 }
  */
+; https://www.autohotkey.com/boards/viewtopic.php?f=7&t=37871&p=282861#p282861
 WinEnum(hwnd:=0, lParam:=0) ;// lParam (internal, used by callback)
 {
 	static pWinEnum := "X" ; pWinEnum will be pointer to WinEnum
@@ -1539,7 +1551,8 @@ WinEnum(hwnd:=0, lParam:=0) ;// lParam (internal, used by callback)
 }
 
 
-/* Function: BrowserEmulation
+/* Function: BrowserEmulationL
+* based on https://autohotkey.com/board/topic/93660-embedded-ie-shellexplorer-render-issues-fix-force-it-to-use-a-newer-render-engine/
  *     FEATURE_BROWSER_EMULATION -> http://goo.gl/V01Frx
  * Syntax:
  *     BrowserEmulation( [ version ] )
@@ -1605,6 +1618,7 @@ FixIE(version:="*") ;// FEATURE_BROWSER_EMULATION -> http://goo.gl/V01Frx
 	}
 		return FixIE() ;// OR return the value itself
 }
+; https://www.autohotkey.com/boards/viewtopic.php?t=39869
 WBGet(WinTitle="ahk_class IEFrame", Svr#=1) {               ;// based on ComObjQuery docs
    static msg := DllCall("RegisterWindowMessage", "str", "WM_HTML_GETOBJECT")
         , IID := "{0002DF05-0000-0000-C000-000000000046}"   ;// IID_IWebBrowserApp
