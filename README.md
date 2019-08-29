@@ -1,2 +1,2 @@
-# TranspTester: [Tests Windows Transparency Functions](../../wiki)
+# [TranspTester](../../wiki): Tests Windows Transparency Functions
 
