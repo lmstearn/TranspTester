@@ -40,6 +40,7 @@ dragForm := 0
 scriptLoaded := 0
 useLayering := 0
 overlayWindow := 0
+SetlayerFn := 0
 WS_BORDER := 0x800000
 WS_SYSMENU := 0x80000
 WS_CAPTION := 0xC00000
@@ -179,14 +180,15 @@ Gui, Add, Radio, vtransUnd gtransUnd HWNDtransUndHwnd, Transparent Underlay
 GuiControl,, transUnd, 1
 Gui, Add, Radio, vtransOver gtransOver HWNDtransOverHwnd, Transparent Overlay
 
-Gui, Add, Slider, NoTicks -theme center w%controlW% HwndprogressTransp vTranspt gTranspt Range0-1, 0
+Gui, Add, Slider, NoTicks -theme center Buddy2myTransp w%controlW% HwndprogressTransp vTranspt gTranspt Range0-1, 0
 Gui, Add, text, w%controlW% vmyTransp
 enableTranspCtrls(myTranspUnder, myTranspOver, overlayWindow)
 
 
-Gui, Add, Checkbox, Section vlistVarz glistVarz HWNDlistVarzHwnd, List Vars
-Gui, Add, Checkbox, vSOExample gSOExample HWNDSOExampleHwnd wp, S.O. Example
-Gui, Add, Button, gGo vGo HWNDGoHwnd wp, &Go
+Gui, Add, Checkbox, Section vlistVarz glistVarz HWNDlistVarzHwnd, Output Vars
+Gui, Add, Checkbox, vSOExample gSOExample HWNDSOExampleHwnd wp, SO Example
+Gui, Add, Checkbox, ys vSetlayer gSetlayer HWNDSetlayerHwnd wp, Use Setlayer
+Gui, Add, Button, xs gGo vGo HWNDGoHwnd wp, &Go
 Gui, Add, Button, yp x+m gQuit vQuit HWNDquitHwnd wp, &Quit
 
 Gui, Show
@@ -681,6 +683,10 @@ Return
 listVarz:
 Gui, Submit, Nohide
 Return
+Setlayer:
+Gui, Submit, Nohide
+GuiControlGet, SetlayerFn,, Setlayer
+Return
 
 
 
@@ -1044,18 +1050,13 @@ OutputStyles(inhWnd, hdc_bmp := 0)
 
 Sub_HideOverlay:
 
-RDW_ERASE := 0x0004
-RDW_INVALIDATE := 0x0001
-RDW_FRAME := 0x0400
-RDW_ALLCHILDREN := 0x0080
 	if (GUI_Overlay_hwnd)
 	Gui GUI_Overlay:Destroy
 
 WinSet, ExStyle, -%WS_EX_LAYERED%, ahk_id%GUI_Underlay_hwnd%
 
+RedrawHwnd(GUI_Underlay_hwnd)
 
-if (!dllcall("RedrawWindow", Ptr, GUI_Underlay_hwnd, Ptr, 0, Ptr, 0, uint, RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN))
-msgbox Redraw failed
 Gui GUI_Underlay: Show
 
 ; Same as...
@@ -1345,6 +1346,8 @@ GUI_OverlayGuiClose:
 GUI_UnderlayGuiClose:
 
 formShowing := 0
+SetTimer, DetectMouse, 50
+
 	if (hdc_bmp && !(CS_OWNDC & Obj.ObjStyle()) && !(CS_CLASSDC & Obj.ObjStyle()))
 	{
 		if (!DllCall("ReleaseDC", "UInt", childhWnd, "UInt", hdc_bmp))
@@ -1396,7 +1399,7 @@ ExitApp
 ProcessLayers(hwnd, hdc_bmp, screenDC, WS_EX_LAYERED, SourceConstantAlpha, hexColour, UpdateLayer := 0, x := 0, y := 0, w := 0, h := 0)
 {
 
-Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayered
+Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayered, pt, bl, Ptr
 
 ;UpdateLayer: 0 cleanup. -1 (underlay), -2 (overlay) initialise, 1 (underlay) 2 (overlay) update
 	if (!UpdateLayer)
@@ -1406,6 +1409,7 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 	VarSetCapacity(CHROMA_KEYO, 0)
 	AC_SRC_ALPHA := 0x0, AC_SRC_OVER := 0
 	ULW_COLORKEY := 0x0, ULW_ALPHA := 0x0
+	Ptr := 0
 	Return
 	}
 
@@ -1423,7 +1427,7 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 	lpCOLORREF := strget(lpCOLORREF)
 	NumPut(COLORREF, (UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), 0, "Uint") 
 	NumPut(lpCOLORREF,(UpdateLayer = 1)? (CHROMA_KEYU): (CHROMA_KEYO), A_PtrSize, "UPtr")
-
+	Ptr := 0
 	; not requ'd...
 	;hdc_dib := DllCall("CreateCompatibleDC", "Uint", screenDC) 
 	;DllCall("CreateCompatibleBitmap", UInt,screenDC, Int,w, Int,h)
@@ -1443,19 +1447,24 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 	else
 	{
 
+	if (!Ptr)
+	{
 	; Calls fail unless "the layering style bit is cleared and set again"
 	WinSet, ExStyle, -%WS_EX_LAYERED%,  % "ahk_id" hwnd
-
+	RedrawHwnd(hwnd)
 	WinSet, ExStyle, +%WS_EX_LAYERED%,  % "ahk_id" hwnd
-
+	VarSetCapacity(bl, 8), NumPut(AC_SRC_OVER, bl, 0, "Char"), NumPut(0, bl, 1, "Char"), NumPut(SourceConstantAlpha, bl, 2, "Char"), NumPut(w, bl, 3, "Char") ;Blendfunction
 	Ptr := (A_PtrSize == 8) ? "UPtr" : "UInt"
-
 	VarSetCapacity(pt, 8)
+	}
+
+
+
+
 	NumPut(x, pt, 0, "UInt"), NumPut(y, pt, 4, "UInt")
 		if (!w || !h)
 		WinGetPos, , , w, h, % "ahk_id" hwnd
 	VarSetCapacity(sz, 8), NumPut(w, sz, 0, "UInt"), NumPut(h, sz, 4, "UInt")
-	VarSetCapacity(bl, 8), NumPut(AC_SRC_OVER, bl, 0, "Char"), NumPut(0, bl, 1, "Char"), NumPut(SourceConstantAlpha, bl, 2, "Char"), NumPut(w, bl, 3, "Char") ;Blendfunction
 
 
 		if (!DllCall("UpdateLayeredWindow", "Ptr", hwnd
@@ -1470,6 +1479,17 @@ Static AC_SRC_ALPHA, AC_SRC_OVER, CHROMA_KEY, ULW_COLORKEY, ULW_ALPHA, hdcLayere
 		msgbox % "UpdateLayeredWindow Failed!`nUpdateLayer is : " UpdateLayer ", SourceConstantAlpha is : " SourceConstantAlpha ", hexColour is: " hexColour,
 
 	}
+}
+
+RedrawHwnd(hwnd)
+{
+RDW_ERASE := 0x0004
+RDW_INVALIDATE := 0x0001
+RDW_FRAME := 0x0400
+RDW_ALLCHILDREN := 0x0080
+   
+	if (!dllcall("RedrawWindow", Ptr, hwnd, Ptr, 0, Ptr, 0, uint, RDW_ERASE | RDW_INVALIDATE | RDW_FRAME | RDW_ALLCHILDREN))
+	msgbox Redraw failed
 }
 /*
  * Function: WinEnum
@@ -1752,7 +1772,9 @@ if MouseIsOverTitlebar()
 		{
 			if (formShowing)
 			{
-				if (useLayering && hdc_bmp)
+				if (formShowing = 1)
+				SetTimer, DetectMouse, 10
+				if (useLayering && hdc_bmp && !SetlayerFn)
 				{
 				WinGetPos, x, y, w, h, ahk_id %GUI_Underlay_hwnd%
 					if (GUI_Overlay_hwnd)
@@ -1762,12 +1784,13 @@ if MouseIsOverTitlebar()
 				}
 				else
 				{
-					if (GUI_Overlay_hwnd)
+					if (!SetlayerFn && GUI_Overlay_hwnd)
 					{
 					Gui GUI_Overlay: Show, Hide
 					dragForm := 1
 					}
 				}
+			formShowing := 2
 			}
 		}
 	}
