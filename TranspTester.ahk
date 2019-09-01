@@ -169,7 +169,6 @@ Gui, Add, text, ys+m w%controlW% HwndtxtIntensityHwnd, TransColor Intensity:
 Gui, Add, Slider, section xp y+m Vertical -theme center Buddy2transIntensity NoTicks h%controlW% HwndtransColIntensityHwnd vtransColIntensity gtransColIntensity Range0-1, 0
 
 Gui, Add, text, xp y+m w%controlW% vtransIntensity, % myTransIntensityUnder
-enableTransColorCtrls()
 
 
 
@@ -182,7 +181,6 @@ Gui, Add, Radio, vtransOver gtransOver HWNDtransOverHwnd, Transparent Overlay
 
 Gui, Add, Slider, NoTicks -theme center Buddy2myTransp w%controlW% HwndprogressTransp vTranspt gTranspt Range0-1, 0
 Gui, Add, text, w%controlW% vmyTransp
-enableTranspCtrls(myTranspUnder, myTranspOver, overlayWindow)
 
 
 Gui, Add, Checkbox, Section vlistVarz glistVarz HWNDlistVarzHwnd, Output Vars
@@ -190,6 +188,10 @@ Gui, Add, Checkbox, vSOExample gSOExample HWNDSOExampleHwnd wp, SO Example
 Gui, Add, Checkbox, ys vSetlayer gSetlayer HWNDSetlayerHwnd wp, Use Setlayer
 Gui, Add, Button, xs gGo vGo HWNDGoHwnd wp, &Go
 Gui, Add, Button, yp x+m gQuit vQuit HWNDquitHwnd wp, &Quit
+
+
+enableTransColorCtrls()
+enableTranspCtrls(myTranspUnder, myTranspOver, overlayWindow)
 
 Gui, Show
 
@@ -1061,24 +1063,6 @@ return
 
 
 
-DownloadFile(URL, ByRef fname)
-{
-		try
-		{
-			UrlDownloadToFile, %URL%, %fname%
-		}
-		catch tmp
-		{
-		msgbox, 8208, FileDownload, Error with the bitmap download!`nSpecifically: %tmp%
-		}		
-	FileGetSize, tmp , % A_ScriptDir . "`\" . fname
-		if tmp < 1000
-		msgbox, 8208, FileDownload, File size is incorrect!
-		sleep 300
-		fname := A_ScriptDir . "`\" . fname
-
-}
-
 ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight, HTML := 0)
 {
 Static WB
@@ -1183,6 +1167,25 @@ Static WB
 
 
 }
+
+DownloadFile(URL, ByRef fname)
+{
+		try
+		{
+			UrlDownloadToFile, %URL%, %fname%
+		}
+		catch tmp
+		{
+		msgbox, 8208, FileDownload, Error with the bitmap download!`nSpecifically: %tmp%
+		}		
+	FileGetSize, tmp , % A_ScriptDir . "`\" . fname
+		if tmp < 1000
+		msgbox, 8208, FileDownload, File size is incorrect!
+		sleep 300
+		fname := A_ScriptDir . "`\" . fname
+
+}
+
 WB_BeforeNavigate2(URL, WB)
 {
 S_OK := 0
@@ -1786,7 +1789,7 @@ if MouseIsOverTitlebar()
 				}
 				else
 				{
-					if (!SetlayerFn && GUI_Overlay_hwnd)
+					if (SetlayerFn && GUI_Overlay_hwnd)
 					{
 					Gui GUI_Overlay: Show, Hide
 					dragForm := 1
