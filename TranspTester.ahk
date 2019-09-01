@@ -109,8 +109,8 @@ GW_CHILD := 0X05
 OverlayVisible := 0
 
 ; ---------------------- More Variable decls----------------------
-guiWidth := 0
-guiHeight := 0
+targWidth := 0
+targHeight := 0
 htmlW := floor(A_ScreenWidth/2)
 htmlH := floor(2 * (A_ScreenHeight/5))
 
@@ -194,9 +194,7 @@ Gui, Add, Button, yp x+m gQuit vQuit HWNDquitHwnd wp, &Quit
 Gui, Show
 
 ; Window must be visible
-GuiGetSize(guiWidth, guiHeight, TranspTesterHwnd)
-targWidth := floor((306/372) * guiWidth)
-targHeight := floor((350/425) * guiHeight)
+GuiGetSize(targWidth, targHeight, TranspTesterHwnd)
 
 
 scriptLoaded := 1
@@ -344,7 +342,6 @@ global
 	ctrlMast(ctrlEnable, isLayered)
 
 
-
 	
 
 	GuiControl, %enable%, %txtIntensityHwnd%
@@ -362,6 +359,10 @@ global
 	GuiControl, %enable%, transIntensity
 	GuiControl, %enable%, transColIntensity
 	GuiControl, %enable%, useOverlay
+		if (isLayered)
+		GuiControl, enable, Setlayer
+		else
+		GuiControl, disable, Setlayer
 
 		if (ctrlEnable)
 		{
@@ -675,10 +676,7 @@ Gui, Submit, Nohide
 	targHeight := htmlH
 	}
 	else
-	{
-	targWidth := floor((306/372) * guiWidth)
-	targHeight := floor((350/425) * guiHeight)
-	}
+	GuiGetSize(targWidth, targHeight, TranspTesterHwnd)
 Return
 listVarz:
 Gui, Submit, Nohide
@@ -812,7 +810,13 @@ GuiControlGet, tmp,, %useActiveXHwnd%
 GuiControlGet, SOExample,, %SOExampleHwnd%
 
 	if (tmp)
+	{
+		if (SOExample)
+		GoSub Sub_BuildHTMLSOExample
+		else
+		Gosub Sub_BuildHTML	
 	ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight, 1)
+	}
 	else
 	{
 	GuiControlGet, tmp,, %useImageHwnd%
@@ -869,15 +873,6 @@ DetectHiddenWindows, %tmp%
 Reload
 }
 DetectHiddenWindows, %tmp%
-GuiControlGet, tmp,, %useActiveXHwnd%
-	if (tmp)
-	{
-	GuiControlGet, tmp,, %SOExampleHwnd%
-		if (tmp)
-		GoSub Sub_BuildHTMLSOExample
-		else
-		Gosub Sub_BuildHTML
-	}
 
 	if (OverlayVisible)
 	Gosub Sub_HideOverlay
@@ -1828,6 +1823,7 @@ MouseIsOverTitlebar()
     CoordMode Mouse, Screen
     MouseGetPos x, y, w
 	CoordMode, Mouse, % tmp
+
     if WinExist("ahk_class Shell_TrayWnd ahk_id " w)  ; Exclude taskbar.
         return false
 
@@ -1839,9 +1835,27 @@ GuiGetSize(ByRef W, ByRef H, TranspTesterHwnd)
 {
 	If WinExist("ahk_id " TranspTesterHwnd)
 	{
+	; Following should be adjusted by GetThemeSysSize
+	SM_CYCAPTION := 4
+	SM_CYSIZEFRAME := 33 ; on this machine, the correct SM_CYFIXEDFRAME doesn't add up!
+	SM_CYEDGE := 46 ; assume 3D
 		VarSetCapacity(rect, 16, 0)
-		DllCall("GetClientRect", uint, TranspTesterHwnd, uint, &rect)
-		W := NumGet(rect, 8, "int")
+		DllCall("GetWindowRect", "Ptr", TranspTesterHwnd, "Ptr", &rect)
+		;DllCall("GetClientRect", uint, TranspTesterHwnd, uint, &rect)
+		tmp := NumGet(rect, 4, "int")
 		H := NumGet(rect, 12, "int")
+		H := H - tmp
+		tmp := NumGet(rect, 0, "int")
+		W := NumGet(rect, 8, "int")
+		W := W - tmp
+		SysGet, tmp, %SM_CYCAPTION%
+		H += tmp
+		SysGet, tmp, %SM_CYSIZEFRAME%
+		H += tmp
+		SysGet, tmp, %SM_CYEDGE%
+		H += tmp
+		W := floor((306/372) * W)
+		H := floor((350/425) * H)
+
 	}
 }
