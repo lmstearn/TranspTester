@@ -1060,10 +1060,36 @@ Gui GUI_Underlay: Show
 return
 
 
+
+DownloadFile(URL, ByRef fname)
+{
+		try
+		{
+			UrlDownloadToFile, %URL%, %fname%
+		}
+		catch tmp
+		{
+		msgbox, 8208, FileDownload, Error with the bitmap download!`nSpecifically: %tmp%
+		}		
+	FileGetSize, tmp , % A_ScriptDir . "`\" . fname
+		if tmp < 1000
+		msgbox, 8208, FileDownload, File size is incorrect!
+		sleep 300
+		fname := A_ScriptDir . "`\" . fname
+
+}
+
 ProcessControls(GUI_Underlay_hwnd, SOExample, targWidth, targHeight, HTML := 0)
 {
 Static WB
 
+
+	if (SOExample)
+	{
+	tmp = FBZq5.png
+	DownloadFile("http://i.stack.imgur.com/FBZq5.png", tmp)
+	}
+		
 
 	if (HTML)
 	{
@@ -1135,38 +1161,19 @@ Static WB
 	}
 	else
 	{
-		if (SOExample)
+		if (!SOExample)
 		{
-		tmp = http://i.stack.imgur.com/FBZq5.png
-		tmp1 = FBZq5.png
-		}
-		else
-		{
-		tmp = https://raw.githubusercontent.com/lmstearn/TranspTester/master/TranspTester.bmp
-		tmp1 = TranspTester.bmp
+		tmp = TranspTester.bmp
+		DownloadFile("https://raw.githubusercontent.com/lmstearn/TranspTester/master/TranspTester.bmp", tmp)
 		}
 
-		try
-		{
-			UrlDownloadToFile, %tmp%, %tmp1%
-		}
-		catch e
-		{
-		msgbox, 8208, FileDownload, Error with the bitmap download!`nSpecifically: %e%
-		}
 
-	FileGetSize, tmp , % A_ScriptDir . "`\" . tmp1
-		if tmp < 1000
-		msgbox, 8208, FileDownload, File size is incorrect!
-		sleep 300
-		tmp1 := A_ScriptDir . "`\" . tmp1
-
-		if Fileexist(tmp1)
-		tmp := LoadPicture(tmp1, GDI+ w%targWidth% h%targHeight%)
+		if Fileexist(tmp)
+		tmp := LoadPicture(tmp, GDI+ w%targWidth% h%targHeight%)
 		else
 		{
 		sleep 300
-		tmp := LoadPicture(tmp1, GDI+ w%targWidth% h%targHeight%)
+		tmp := LoadPicture(tmp, GDI+ w%targWidth% h%targHeight%)
 		}
  
 	Gui GUI_Underlay: Add, Picture, , % "HBITMAP:*" tmp
